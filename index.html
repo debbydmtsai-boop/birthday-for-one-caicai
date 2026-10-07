@@ -116,7 +116,8 @@ function makeProfile({ name, version, month, day, age }) {
   if (!Number.isInteger(a) || a < 1 || a > 99) throw new Error('年齡請填入 1～99。');
   return { name: name.trim(), version, month: m, day: d, age: a, zodiac: zodiac(m, d) };
 }
-const count = (state, chapter) => chapter.moments.filter(m => Object.hasOwn(state.answers, m.id)).length;
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+const count = (state, chapter) => chapter.moments.filter(m => hasOwn(state.answers, m.id)).length;
 const allAnswered = state => chapters.every(ch => count(state, ch) === 3);
 const completed = state => state.wished && state.blown && allAnswered(state);
 function saveAnswer(state, id, value) {
@@ -139,7 +140,7 @@ const footer = () => `<p class="footer">這段旅程留在這台裝置的瀏覽�
 function paint(html) {
   app.innerHTML = top() + html;
   document.querySelector('#sound').onclick = toggleMusic;
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (_) { window.scrollTo(0, 0); }
 }
 function go(next) { stopMic(); route = next; render(); }
 function toast(message) { document.querySelector('.toast')?.remove(); const el = document.createElement('div'); el.className='toast'; el.setAttribute('role','status'); el.textContent=message; document.body.append(el); setTimeout(()=>el.remove(),3200); }
@@ -192,7 +193,7 @@ function openChapter(index) {
 function timeChoice(){const ch=chapters[chapterIndex];paint(`<main class="page"><div class="intro"><p class="eyebrow">${ch.icon} ${ch.time}</p><h1 class="title">${ch.title}</h1><p class="sub">${chapterIndex===1?'現在還是早上。':'現在還沒到夜晚。'}<br>如果你想晚一點再回來，我們會把這裡留給你。</p></div><div class="actions"><button class="primary full" id="continue-now">現在就繼續</button><button class="secondary full" id="later">晚點再回來</button></div></main>`);document.querySelector('#continue-now').onclick=()=>go('moment');document.querySelector('#later').onclick=()=>go('map');}
 function moment() {
   const ch=chapters[chapterIndex], m=ch.moments[momentIndex], saved=state.answers[m.id]??'';
-  paint(`<main class="page"><div class="intro"><p class="eyebrow">${ch.icon} ${ch.title}</p><h1 class="title">${ch.lead}</h1></div><div class="panel"><div class="step-meta"><span>小片刻 ${momentIndex+1} / 3</span><span>${count(state,ch)} / 3 已留下</span></div><h2 class="moment-title">${m.title}</h2><p class="prompt">${m.prompt}</p>${m.kind==='choice'?`<div class="choices">${m.options.map(option=>`<button type="button" class="choice" data-choice="${esc(option)}" aria-pressed="${saved===option}">${esc(option)}</button>`).join('')}</div>`:`<label class="field"><span class="hidden">你的回答</span><textarea id="answer" maxlength="120" placeholder="${esc(m.placeholder)}">${esc(saved)}</textarea></label>`}<div class="actions"><button id="save-moment" class="primary full">${momentIndex===2?'留下這個小片刻':'繼續下一個小片刻'}</button><button id="leave-blank" class="quiet full">${Object.hasOwn(state.answers,m.id)?'清空，先留白':'先留白，繼續走'}</button></div></div><button class="quiet full" id="back-map">回到生日的一天</button></main>`);
+  paint(`<main class="page"><div class="intro"><p class="eyebrow">${ch.icon} ${ch.title}</p><h1 class="title">${ch.lead}</h1></div><div class="panel"><div class="step-meta"><span>小片刻 ${momentIndex+1} / 3</span><span>${count(state,ch)} / 3 已留下</span></div><h2 class="moment-title">${m.title}</h2><p class="prompt">${m.prompt}</p>${m.kind==='choice'?`<div class="choices">${m.options.map(option=>`<button type="button" class="choice" data-choice="${esc(option)}" aria-pressed="${saved===option}">${esc(option)}</button>`).join('')}</div>`:`<label class="field"><span class="hidden">你的回答</span><textarea id="answer" maxlength="120" placeholder="${esc(m.placeholder)}">${esc(saved)}</textarea></label>`}<div class="actions"><button id="save-moment" class="primary full">${momentIndex===2?'留下這個小片刻':'繼續下一個小片刻'}</button><button id="leave-blank" class="quiet full">${hasOwn(state.answers,m.id)?'清空，先留白':'先留白，繼續走'}</button></div></div><button class="quiet full" id="back-map">回到生日的一天</button></main>`);
   let choice=saved;
   document.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>{choice=b.dataset.choice;document.querySelectorAll('[data-choice]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
   const finish=(value)=>{saveAnswer(state,m.id,value);if(momentIndex<2){momentIndex++;go('moment');}else{justFinishedIndex=chapterIndex;const nextIncomplete=chapters.findIndex(other=>count(state,other)<3);if(nextIncomplete>=0){chapterIndex=nextIncomplete;momentIndex=Math.min(count(state,chapters[chapterIndex]),2);}go('chapter-done');}};
@@ -218,7 +219,14 @@ function memory(){const p=state.profile;const chosen=[state.answers.m2,state.ans
 function wrapCanvas(ctx,text,x,y,width,lineHeight,maxLines=3){let line='',lines=0;for(const char of String(text)){if(ctx.measureText(line+char).width>width&&line){ctx.fillText(line,x,y);y+=lineHeight;line='';lines++;if(lines>=maxLines)return y;}line+=char;}if(line){ctx.fillText(line,x,y);y+=lineHeight;}return y;}
 async function downloadMemory(){const p=state.profile, canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1500;const c=canvas.getContext('2d');c.fillStyle='#fff8e9';c.fillRect(0,0,1080,1500);c.strokeStyle='#cfaa69';c.lineWidth=4;c.strokeRect(45,45,990,1410);c.textAlign='center';c.fillStyle='#9e7547';c.font='32px serif';c.fillText('✦  MY BIRTHDAY MEMORY  ✦',540,130);if(photoMode==='upload'&&photoUrl){try{const im=new Image();im.src=photoUrl;await im.decode();const ratio=Math.max(540/im.width,330/im.height);c.save();c.beginPath();c.roundRect(270,170,540,330,26);c.clip();c.drawImage(im,270+(540-im.width*ratio)/2,170+(330-im.height*ratio)/2,im.width*ratio,im.height*ratio);c.restore();}catch{}}else{c.fillStyle='#f5e7d2';c.fillRect(270,170,540,330);c.fillStyle='#b39260';c.font='80px serif';c.fillText('✦',540,370);}c.fillStyle='#6a4b37';c.font='bold 54px serif';c.fillText(`${p.name}，生日快樂。`,540,590);c.font='31px sans-serif';c.fillStyle='#876c54';c.fillText(`${p.month} 月 ${p.day} 日 · ${p.age} 歲 · ${p.zodiac.name} ${p.zodiac.symbol}`,540,655);const date=state.completedAt?new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long',day:'numeric'}).format(new Date(state.completedAt)):'';c.fillText(date,540,710);c.strokeStyle='#dbc397';c.beginPath();c.moveTo(200,755);c.lineTo(880,755);c.stroke();c.textAlign='left';c.font='32px sans-serif';c.fillStyle='#695543';let y=815;for(const answer of [state.answers.m2,state.answers.a3,state.answers.n3].filter(Boolean).slice(0,3)){y=wrapCanvas(c,answer,180,y,720,47,2)+26;}c.textAlign='center';c.font='34px serif';c.fillStyle='#8b683f';c.fillText('今年，我也為自己許了一個願。',540,1320);c.fillText('原來一個人，也可以好好過生日。',540,1374);canvas.toBlob(blob=>{if(!blob){toast('紀念卡下載失敗，請稍後再試。');return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='我的生日紀念卡.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);},'image/png');}
 function render(){applyTheme(state.profile?.version||selectedVersion);if(route==='setup')setup();else if(route==='morning-film')film('morning');else if(route==='delivery-film')film('delivery');else if(route==='map')map();else if(route==='moment')moment();else if(route==='time-choice')timeChoice();else if(route==='chapter-done')chapterDone();else if(route==='wish')wish();else if(route==='blow')blow();else if(route==='memory')memory();}
-window.addEventListener('beforeunload',stopMic);render();
+window.addEventListener('beforeunload',stopMic);
+function showStartupError(err) {
+  console.error('Birthday app startup error:', err);
+  const target = document.querySelector('#app');
+  if (!target) return;
+  target.innerHTML = `<main class="page"><div class="intro"><p class="eyebrow">生日旅程</p><h1 class="title">這次沒有順利開始。</h1><p class="sub">請重新整理頁面再試一次。</p></div><div class="panel"><p class="hint">如果重新整理後仍看到這個畫面，請把畫面截圖給我，我會直接依錯誤訊息修正。</p><p class="error" style="word-break:break-word">${esc(err?.message || err || 'Unknown startup error')}</p><button class="primary full" type="button" onclick="location.reload()">重新整理</button></div></main>`;
+}
+try { render(); } catch (err) { showStartupError(err); }
 </script>
 </body>
 </html>
