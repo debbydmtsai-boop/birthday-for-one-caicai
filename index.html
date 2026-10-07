@@ -25,11 +25,6 @@
   <div class="ambient" aria-hidden="true"></div>
   <div id="app" class="app-shell"><main class="page"><div class="intro"><h1 class="title">在生日開始以前……</h1><p class="sub">正在準備你的生日。</p></div></main></div>
   <audio id="music" src="birthday-music.mp3" preload="none" loop></audio>
-  <script src="candles-lit.js"></script>
-<script src="candles-blowing.js"></script>
-<script src="candles-smoke.js"></script>
-<script src="candles-just.js"></script>
-<script src="candles-unlit.js"></script>
 <script>const chapters = [
   {
     id: 'morning', icon: '☀️', title: '早晨｜今天的我', time: '早晨',
@@ -64,8 +59,8 @@
 ];
 
 const theme = {
-  girl: { label: '女生版', accent: '#ba7f80', tint: '#f7e5e1', deep: '#794f58', video: 'morning-girl.mp4' },
-  boy: { label: '男生版', accent: '#658c83', tint: '#e2eee8', deep: '#3d6661', video: 'morning-boy.mp4' }
+  girl: { label: '女生版', accent: '#ba7f80', tint: '#f7e5e1', deep: '#794f58', video: '女生早晨影片.MP4' },
+  boy: { label: '男生版', accent: '#658c83', tint: '#e2eee8', deep: '#3d6661', video: '男生早晨影片.MP4' }
 };
 
 const signs = [
@@ -87,7 +82,28 @@ const candleStages = {
   lit: '01_lit', blowing: '02_blowing', smoke: '03_smoke', just: '04_just_extinguished', unlit: '05_unlit'
 };
 function candlePath(stage, digit) {
-  return window.BIRTHDAY_CANDLES[stage][digit];
+  return window.BIRTHDAY_CANDLES?.[stage]?.[digit] || '';
+}
+const candleFiles = ['candles-lit.js','candles-blowing.js','candles-smoke.js','candles-just.js','candles-unlit.js'];
+let candleLoadPromise = null;
+function candlesReady() {
+  const c = window.BIRTHDAY_CANDLES;
+  return Boolean(c && c.lit && c.blowing && c.smoke && c.just && c.unlit);
+}
+function ensureCandlesLoaded() {
+  if (candlesReady()) return Promise.resolve();
+  if (candleLoadPromise) return candleLoadPromise;
+  candleLoadPromise = Promise.all(candleFiles.map(src => new Promise((resolve,reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`無法載入 ${src}`));
+    document.head.appendChild(script);
+  }))).then(() => {
+    if (!candlesReady()) throw new Error('蠟燭素材沒有完整載入');
+  });
+  return candleLoadPromise;
 }
 
 
@@ -142,7 +158,16 @@ function paint(html) {
   document.querySelector('#sound').onclick = toggleMusic;
   try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (_) { window.scrollTo(0, 0); }
 }
-function go(next) { stopMic(); route = next; render(); }
+function go(next) {
+  stopMic();
+  route = next;
+  if ((next === 'wish' || next === 'blow') && !candlesReady()) {
+    paint(`<main class="page"><div class="intro"><p class="eyebrow">🕯️ 生日蠟燭</p><h1 class="title">正在點亮，<br>屬於你的蠟燭。</h1><p class="sub">再一下下，就準備好了。</p></div></main>`);
+    ensureCandlesLoaded().then(render).catch(showStartupError);
+    return;
+  }
+  render();
+}
 function toast(message) { document.querySelector('.toast')?.remove(); const el = document.createElement('div'); el.className='toast'; el.setAttribute('role','status'); el.textContent=message; document.body.append(el); setTimeout(()=>el.remove(),3200); }
 function applyTheme(version) { const v = theme[version]; document.documentElement.style.setProperty('--accent',v?.accent||'#b78365'); document.documentElement.style.setProperty('--tint',v?.tint||'#f8e9da'); document.documentElement.style.setProperty('--deep',v?.deep||'#755341'); }
 function toggleMusic() { musicWanted = !musicWanted; if(musicWanted) { music.volume=.35; music.play().catch(()=>toast('輕觸畫面後，可再開啟音樂。')); } else music.pause(); document.querySelector('#sound').textContent=musicWanted?'♫ 音樂開':'♫ 音樂關'; }
@@ -226,7 +251,7 @@ function showStartupError(err) {
   if (!target) return;
   target.innerHTML = `<main class="page"><div class="intro"><p class="eyebrow">生日旅程</p><h1 class="title">這次沒有順利開始。</h1><p class="sub">請重新整理頁面再試一次。</p></div><div class="panel"><p class="hint">如果重新整理後仍看到這個畫面，請把畫面截圖給我，我會直接依錯誤訊息修正。</p><p class="error" style="word-break:break-word">${esc(err?.message || err || 'Unknown startup error')}</p><button class="primary full" type="button" onclick="location.reload()">重新整理</button></div></main>`;
 }
-try { render(); } catch (err) { showStartupError(err); }
+try { render(); setTimeout(() => ensureCandlesLoaded().catch(err => console.warn(err)), 1200); } catch (err) { showStartupError(err); }
 </script>
 </body>
 </html>
